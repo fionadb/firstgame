@@ -13,12 +13,12 @@ BODY_FONT='font/bodyfont.ttf'
 TEXT_COLOUR='white'
 PACMAN_OPEN='pacmanOpen.png'
 PACMAN_CLOSED='pacmanClosed.png'
-TICTAC_IMAGE='tictac.png'
-PACMAN_SPEED=6
-STARTING_X=80
-STARTING_Y=20
+TICTAC_IMAGE='star.png'
+PACMAN_SPEED=5
 GRID_WIDTH=50
 GRID_HEIGHT=50 #this is the size of individual game elements eg pacman and the tictacs
+STARTING_X=GRID_WIDTH
+STARTING_Y=GRID_HEIGHT
 
 #initialisation
 pygame.init ()
@@ -32,6 +32,8 @@ class surface:
         self.surface=pygame.Surface((width,height))
         self.x=x
         self.y=y
+        self.width=width
+        self.height=height
 
     def setColor(self,colour='orange'):
         self.surface.fill(colour)
@@ -71,7 +73,7 @@ class button(text):
 class sprite(image):
     def __init__(self, fileLocation, x, y):
         super().__init__(fileLocation, x, y)
-        self.rect=self.surface.get_rect(topleft=(self.x,self.y))
+        self.rect=self.surface.get_rect(center=(self.x,self.y))
         self.speed=0 #by default the sprite's speed is set to 0
 
     def appear(self):
@@ -96,10 +98,11 @@ class obsticle(surface):
     global allObsticles
     allObsticles=[]
 
-    def __init__(self, x, y, width, height):
-        super().__init__(x=x, y=y, width=width, height=height)
+    def __init__(self, x, y, width, height, colour='blue'):
+        super().__init__(x=x, y=y, width=width-1, height=height-1)
         self.rect=self.surface.get_rect(topleft=(self.x,self.y))
         allObsticles.append(self)
+        self.surface.fill(colour)
 
     @classmethod
     def show(obsticle):
@@ -111,6 +114,36 @@ class obsticle(surface):
         for each in allObsticles:
             if each.rect.colliderect(object.rect):
                 print('cant move into object')
+
+    @classmethod
+    def intagabilityOff(obsticle, object):
+        global down
+        global right
+        global left
+        global up
+        global down
+        if right==1:
+            futurex=object.rect.right+object.speed
+            for each in allObsticles:
+                if each.x <= futurex <= each.x+each.width and each.y <= object.y <= each.y+each.height:
+                    right=0
+        if left==1:
+            futurex=object.rect.left-object.speed
+            for each in allObsticles:
+                if each.x <= futurex <= each.x+each.width and each.y <= object.y <= each.y+each.height:
+                    left=0
+        if down==1:
+            futurey=object.rect.bottom+object.speed
+            for each in allObsticles:
+                if each.x <= object.x <= each.x+each.width and each.y <= futurey <= each.y+each.height:
+                    down=0
+        if up==1:
+            futurey=object.rect.top-object.speed
+            for each in allObsticles:
+                if each.x <= object.x <= each.x+each.width and each.y <= futurey <= each.y+each.height:
+                    up=0
+            
+
 
 class tictac(surface):
     global allTictacs
@@ -124,11 +157,15 @@ class tictac(surface):
 
     @classmethod
     def generate(tictac):
-        n=grid()
-        for o in range(n):
-            x=xValues[o]
-            y=yValues[o]
-            o=tictac(x,y)
+        grid()
+        for x in xValues:
+            for y in  yValues:
+                make=1
+                for each in allObsticles:
+                    if each.x <= x <= each.x+each.width and each.y <= y <= each.y+each.height:
+                        make=0
+                    else: pass
+                if make==1: a=tictac(x,y)
 
     @classmethod
     def show(tictac):
@@ -147,9 +184,12 @@ def grid():
     yValues=[]
     area=WIN_WIDTH*WIN_HEIGHT
     gridarea=GRID_WIDTH*GRID_HEIGHT
+    gridsPerRow=int(WIN_WIDTH/GRID_WIDTH)
+    gridsPerColoumn=int(WIN_HEIGHT/GRID_HEIGHT)
     nGrids=int(area/gridarea)
-    for n in range(nGrids):
+    for n in range(gridsPerRow):
         xValues.append(n*GRID_WIDTH)
+    for n in range(gridsPerColoumn):
         yValues.append(n*GRID_HEIGHT)
     return nGrids
 
@@ -175,14 +215,27 @@ def pause():
 background=image(BG_IMAGE)
 
 #defines where the obsticals are
-leftBoundary=obsticle(0,0,STARTING_X,WIN_HEIGHT)
-leftBoundary.setColor('green')
-rightBoundary=obsticle(WIN_WIDTH-STARTING_X,0, STARTING_X, WIN_HEIGHT)
-rightBoundary.setColor('blue')
-upperBoundary=obsticle(0,0,WIN_WIDTH,STARTING_Y)
-upperBoundary.setColor()
-lowerBoundary=obsticle(0,WIN_HEIGHT-STARTING_Y,WIN_WIDTH,STARTING_Y)
-lowerBoundary.setColor()
+leftBoundary=obsticle(0,0,GRID_WIDTH,WIN_HEIGHT)
+rightBoundary=obsticle(WIN_WIDTH-GRID_WIDTH,0, GRID_WIDTH, WIN_HEIGHT)
+upperBoundary=obsticle(0,0,WIN_WIDTH,GRID_HEIGHT)
+lowerBoundary=obsticle(0,WIN_HEIGHT-GRID_HEIGHT,WIN_WIDTH,GRID_HEIGHT)
+H1=obsticle(leftBoundary.rect.right+GRID_WIDTH,upperBoundary.rect.bottom+GRID_HEIGHT,GRID_WIDTH,GRID_HEIGHT*6,'red')
+H2=obsticle(H1.x+GRID_WIDTH,H1.y+3*GRID_HEIGHT,GRID_WIDTH*4,GRID_HEIGHT,'red')
+H3=obsticle(H2.rect.right,H1.y,GRID_WIDTH,H1.height,'red')
+underH=obsticle(H2.x+GRID_WIDTH,H2.y+2*GRID_HEIGHT,2*GRID_WIDTH,GRID_HEIGHT,'green')
+line1=obsticle(H1.x,H1.rect.bottom+GRID_HEIGHT,6*GRID_WIDTH,GRID_HEIGHT)
+onH1=obsticle(H1.x+2*GRID_WIDTH,H1.y,GRID_WIDTH,2*GRID_HEIGHT,'green')
+onH2=obsticle(onH1.rect.right,onH1.y+GRID_HEIGHT,2*GRID_WIDTH,GRID_HEIGHT,'green')
+line2=obsticle(H3.rect.right+GRID_WIDTH,H3.y,2*GRID_WIDTH,H3.height)
+line3=obsticle(line1.rect.right+2*GRID_WIDTH,line1.y,line1.width,line1.height)
+line4=obsticle(line2.rect.right+2*GRID_WIDTH,line2.y,4*GRID_WIDTH,line3.height,'orange')
+F1=obsticle(line4.rect.right+2*GRID_WIDTH,H1.y,GRID_WIDTH,H1.height+GRID_HEIGHT,'pink')
+F2=obsticle(F1.rect.right,F1.y,3*GRID_WIDTH,GRID_HEIGHT,'pink')
+F3=obsticle(F1.rect.right,F2.rect.bottom+GRID_HEIGHT,3*GRID_WIDTH,GRID_HEIGHT,'pink')
+#line6=obsticle(F1.x,F1.rect.bottom+GRID_HEIGHT,GRID_WIDTH,2*GRID_HEIGHT,'yellow')
+underF=obsticle(F1.rect.right+GRID_WIDTH,F3.rect.bottom+GRID_HEIGHT,2*GRID_WIDTH,2*GRID_HEIGHT,'green')
+line5=obsticle(underF.x,underF.rect.bottom+GRID_HEIGHT,GRID_WIDTH*3,GRID_HEIGHT)
+
 
 #creates pacman
 pacman=sprite(PACMAN_CLOSED,STARTING_X,STARTING_Y)
@@ -199,6 +252,7 @@ right=0
 
 #creates tictacs
 tictac.generate()
+print(str(len(allTictacs)))
 
 #contains the code which updates the game continuously
 while True: 
@@ -235,6 +289,7 @@ while True:
                 right=0
 
     obsticle.checkCollisions(pacman)
+    obsticle.intagabilityOff(pacman)
     if down==1: pacman.movedown()
     if up==1: pacman.moveup()
     if left==1: pacman.moveleft()
