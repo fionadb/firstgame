@@ -2,6 +2,7 @@ import pygame
 from sys import exit
 from pygame import color
 from pygame.constants import KEYUP, MOUSEBUTTONDOWN
+from pygame.sprite import collide_rect
 
 #constants
 WIN_WIDTH=1300
@@ -13,12 +14,17 @@ BODY_FONT='font/bodyfont.ttf'
 TEXT_COLOUR='white'
 PACMAN_OPEN='pacmanOpen.png'
 PACMAN_CLOSED='pacmanClosed.png'
+MOUSERIGHT='mouseright.png'
+MOUSELEFT='mouseleft.png'
+MOUSEUP='mouseup.png'
+MOUSEDOWN='mousedown.png'
 TICTAC_IMAGE='star.png'
 PACMAN_SPEED=5
 GRID_WIDTH=50
 GRID_HEIGHT=50 #this is the size of individual game elements eg pacman and the tictacs
-STARTING_X=GRID_WIDTH
-STARTING_Y=GRID_HEIGHT
+STARTING_X=50
+STARTING_Y=50
+PACMAN_SIZE=(30,30)
 
 #initialisation
 pygame.init ()
@@ -41,10 +47,16 @@ class surface:
     def appear(self):
         window.blit(self.surface,(self.x,self.y))
 
-class image (surface):
-    def __init__(self,fileLocation,x=0,y=0):
-        super().__init__(x,y)
+class image ():
+    def __init__(self,fileLocation,x=0,y=0,size='na'):
         self.surface=pygame.image.load(fileLocation).convert_alpha()
+        if size != 'na':
+            self.surface=pygame.transform.scale(self.surface,size)
+        self.x=x
+        self.y=y
+
+    def appear(self):
+        window.blit(self.surface,(self.x,self.y))
         
 class text (surface):
     def __init__(self,x,y,text='test',font='body',colour='white'):
@@ -62,19 +74,28 @@ class text (surface):
             raise Exception (f'{font} is not a valid font type')
 
 class button(text):
-    def __init__(self, text, buttonColour='None', textColour='white'):
+    def __init__(self, text, buttonColour='None', textColour='white',location='default',point='center'):
         super().__init__(x=0,y=0,text=text, font='body',colour=textColour)
-        self.rect=self.surface.get_rect(center=(WIN_WIDTH/2,WIN_HEIGHT/2))
+        if location=='default': self.rect=self.surface.get_rect(center=(WIN_WIDTH/2,WIN_HEIGHT/2))
+        elif point=='center': self.rect=self.surface.get_rect(center=location)
+        elif point=='topLeft': self.rect=self.surface.get_rect(topleft=location)
         self.buttonColour=buttonColour
         
     def appear(self):
+        if self.buttonColour!='None':
+                pygame.draw.rect(window,self.buttonColour,self.rect)
         window.blit(self.surface,self.rect)
 
-class sprite(image):
+class sprite(pygame.sprite.Sprite):
     def __init__(self, fileLocation, x, y):
-        super().__init__(fileLocation, x, y)
-        self.rect=self.surface.get_rect(center=(self.x,self.y))
+        super().__init__()
+        self.surface=pygame.image.load(fileLocation).convert_alpha()
+        self.x=x
+        self.y=y
+        self.rect=self.surface.get_rect(topleft=(self.x,self.y))
         self.speed=0 #by default the sprite's speed is set to 0
+        self.rats=[]
+        self.rats
 
     def appear(self):
         window.blit(self.surface,self.rect)
@@ -83,15 +104,19 @@ class sprite(image):
         self.speed=speed
 
     def moveright(self):
+        pacman.surface=pygame.image.load(MOUSERIGHT).convert_alpha()
         self.rect.x+=self.speed
 
     def moveleft(self):
+        pacman.surface=pygame.image.load(MOUSELEFT).convert_alpha()
         self.rect.x-=self.speed
 
     def moveup(self):
+        pacman.surface=pygame.image.load(MOUSEUP).convert_alpha()
         self.rect.y-=self.speed
     
     def movedown(self):
+        pacman.surface=pygame.image.load(MOUSEDOWN).convert_alpha()
         self.rect.y+=self.speed
 
 class obsticle(surface):
@@ -100,6 +125,7 @@ class obsticle(surface):
 
     def __init__(self, x, y, width, height, colour='blue'):
         super().__init__(x=x, y=y, width=width-1, height=height-1)
+        self.colour=colour
         self.rect=self.surface.get_rect(topleft=(self.x,self.y))
         allObsticles.append(self)
         self.surface.fill(colour)
@@ -108,12 +134,6 @@ class obsticle(surface):
     def show(obsticle):
         for each in allObsticles:
             each.appear()
-            
-    @classmethod
-    def checkCollisions(obsticle, object):
-        for each in allObsticles:
-            if each.rect.colliderect(object.rect):
-                print('cant move into object')
 
     @classmethod
     def intagabilityOff(obsticle, object):
@@ -124,26 +144,28 @@ class obsticle(surface):
         global down
         if right==1:
             futurex=object.rect.right+object.speed
+            number=1
             for each in allObsticles:
-                if each.x <= futurex <= each.x+each.width and each.y <= object.y <= each.y+each.height:
-                    right=0
+                    if each.x <= futurex <= (each.x+each.width) and ((each.y <= object.rect.top <= (each.y+each.height)) or (each.y <= object.rect.bottom <= (each.y+each.height))):
+                        right=0
         if left==1:
             futurex=object.rect.left-object.speed
+            number=1
             for each in allObsticles:
-                if each.x <= futurex <= each.x+each.width and each.y <= object.y <= each.y+each.height:
+                if each.x <= futurex <= each.x+each.width and ((each.y <= object.rect.top <= (each.y+each.height)) or (each.y <= object.rect.bottom <= (each.y+each.height))):
                     left=0
+                number+=1
         if down==1:
             futurey=object.rect.bottom+object.speed
             for each in allObsticles:
-                if each.x <= object.x <= each.x+each.width and each.y <= futurey <= each.y+each.height:
+                if each.y <= futurey <= each.y+each.height and ((each.x <= object.rect.left <= (each.x+each.width)) or (each.x <= object.rect.right <= (each.x+each.width))):
                     down=0
         if up==1:
             futurey=object.rect.top-object.speed
             for each in allObsticles:
-                if each.x <= object.x <= each.x+each.width and each.y <= futurey <= each.y+each.height:
+                if each.y <= futurey <= each.y+each.height and ((each.x <= object.rect.left <= (each.x+each.width)) or (each.x <= object.rect.right <= (each.x+each.width))):
                     up=0
             
-
 
 class tictac(surface):
     global allTictacs
@@ -154,6 +176,7 @@ class tictac(surface):
         self.surface=pygame.image.load(TICTAC_IMAGE).convert_alpha()
         self.rect=self.surface.get_rect(topleft=(self.x,self.y))
         allTictacs.append(self)
+        self.show=True
 
     @classmethod
     def generate(tictac):
@@ -164,19 +187,34 @@ class tictac(surface):
                 for each in allObsticles:
                     if each.x <= x <= each.x+each.width and each.y <= y <= each.y+each.height:
                         make=0
+                    elif (WIN_WIDTH/2) <= x <= (WIN_WIDTH/2)+150 and (WIN_HEIGHT/2)-50 <= y <= (WIN_HEIGHT/2)+50:
+                        make=0
                     else: pass
                 if make==1: a=tictac(x,y)
 
     @classmethod
     def show(tictac):
         for each in allTictacs:
-            each.appear()
+            if each.show==True:
+                each.appear()
 
     @classmethod
     def number(tictac):
         print(str(len(allTictacs)))
-                
 
+    @classmethod
+    def getsEaten(tictac):
+        global score
+        global time
+        for each in allTictacs:
+            if each.rect.colliderect(pacman.rect):
+                if each.show==True:
+                    each.show=False
+                    score+=1
+                    time=10
+                    
+
+                
 def grid():
     global xValues
     global yValues
@@ -232,17 +270,18 @@ line4=obsticle(line2.rect.right+2*GRID_WIDTH,line2.y,4*GRID_WIDTH,line3.height,'
 F1=obsticle(line4.rect.right+2*GRID_WIDTH,H1.y,GRID_WIDTH,H1.height+GRID_HEIGHT,'pink')
 F2=obsticle(F1.rect.right,F1.y,3*GRID_WIDTH,GRID_HEIGHT,'pink')
 F3=obsticle(F1.rect.right,F2.rect.bottom+GRID_HEIGHT,3*GRID_WIDTH,GRID_HEIGHT,'pink')
-#line6=obsticle(F1.x,F1.rect.bottom+GRID_HEIGHT,GRID_WIDTH,2*GRID_HEIGHT,'yellow')
 underF=obsticle(F1.rect.right+GRID_WIDTH,F3.rect.bottom+GRID_HEIGHT,2*GRID_WIDTH,2*GRID_HEIGHT,'green')
 line5=obsticle(underF.x,underF.rect.bottom+GRID_HEIGHT,GRID_WIDTH*3,GRID_HEIGHT)
 
 
 #creates pacman
-pacman=sprite(PACMAN_CLOSED,STARTING_X,STARTING_Y)
+pacman=sprite(MOUSERIGHT,STARTING_X,STARTING_Y)
 pacman.setSpeed(PACMAN_SPEED)
+pacmanGroup=pygame.sprite.Group()
+pacmanGroup.add(pacman)
 
 #creates buttons
-pausedButton=button('Click to unpause','blue')
+pausedButton=button('Click to unpause','red')
 
 #initialises movement values
 up=0
@@ -252,7 +291,7 @@ right=0
 
 #creates tictacs
 tictac.generate()
-print(str(len(allTictacs)))
+score=-1
 
 #contains the code which updates the game continuously
 while True: 
@@ -263,8 +302,6 @@ while True:
             exit()
         #pauses game if player presses right mouse button
         if event.type==MOUSEBUTTONDOWN:
-            if pausedButton.buttonColour!='None':
-                pygame.draw.rect(window,pausedButton.buttonColour,pausedButton.rect)
             pausedButton.appear()
             pygame.display.update()
             pause()
@@ -288,7 +325,6 @@ while True:
             if event.key==pygame.K_RIGHT:
                 right=0
 
-    obsticle.checkCollisions(pacman)
     obsticle.intagabilityOff(pacman)
     if down==1: pacman.movedown()
     if up==1: pacman.moveup()
@@ -303,8 +339,19 @@ while True:
     #the order things will appear on screen
     background.appear()
     obsticle.show()
+    pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
     pacman.appear()
+    tictac.getsEaten()
     tictac.show()
+    # if time > 0:
+    #     pacman.surface=pygame.image.load(PACMAN_OPEN).convert_alpha()
+    #     pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
+    # else:
+    #     pacman.surface=pygame.image.load(PACMAN_CLOSED).convert_alpha()
+    #     pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
+    time-=1
+    scoreShow=button('score:' + str(score),'None','white',(0,0),'topLeft')
+    scoreShow.appear()
 
     #causes display window to continually update at chosen framerate
     pygame.display.update()
