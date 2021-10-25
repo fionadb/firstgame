@@ -1,8 +1,9 @@
 import pygame
-from sys import exit
+from sys import exit, get_asyncgen_hooks
 from pygame import color
-from pygame.constants import KEYUP, MOUSEBUTTONDOWN
+from pygame.constants import HAT_RIGHTDOWN, KEYUP, MOUSEBUTTONDOWN
 from pygame.sprite import collide_rect
+import random
 
 #constants
 WIN_WIDTH=1300
@@ -14,17 +15,24 @@ BODY_FONT='font/bodyfont.ttf'
 TEXT_COLOUR='white'
 PACMAN_OPEN='pacmanOpen.png'
 PACMAN_CLOSED='pacmanClosed.png'
-MOUSERIGHT='mouseright.png'
-MOUSELEFT='mouseleft.png'
-MOUSEUP='mouseup.png'
-MOUSEDOWN='mousedown.png'
+MOUSERIGHT='mousey.png'
 TICTAC_IMAGE='star.png'
+CAT1='cat1.png'
+CAT2='cat2.png'
+CAT3='cat3.png'
+HEART='heart.png'
 PACMAN_SPEED=5
 GRID_WIDTH=50
 GRID_HEIGHT=50 #this is the size of individual game elements eg pacman and the tictacs
 STARTING_X=50
 STARTING_Y=50
 PACMAN_SIZE=(30,30)
+CAT1X=WIN_WIDTH/2
+CAT1Y=WIN_HEIGHT/2
+CAT2X= (WIN_WIDTH/2)+GRID_WIDTH
+CAT2Y= (WIN_HEIGHT/2)+GRID_HEIGHT
+CAT3X= (WIN_WIDTH/2)+2*GRID_WIDTH
+CAT3Y= (WIN_HEIGHT/2)+GRID_HEIGHT
 
 #initialisation
 pygame.init ()
@@ -86,7 +94,7 @@ class button(text):
                 pygame.draw.rect(window,self.buttonColour,self.rect)
         window.blit(self.surface,self.rect)
 
-class sprite(pygame.sprite.Sprite):
+class sprite():
     def __init__(self, fileLocation, x, y):
         super().__init__()
         self.surface=pygame.image.load(fileLocation).convert_alpha()
@@ -94,8 +102,12 @@ class sprite(pygame.sprite.Sprite):
         self.y=y
         self.rect=self.surface.get_rect(topleft=(self.x,self.y))
         self.speed=0 #by default the sprite's speed is set to 0
-        self.rats=[]
-        self.rats
+        self.right=0
+        self.left=0
+        self.up=0
+        self.down=0
+        self.cornerInd=0
+        self.livesLeft=3
 
     def appear(self):
         window.blit(self.surface,self.rect)
@@ -104,20 +116,67 @@ class sprite(pygame.sprite.Sprite):
         self.speed=speed
 
     def moveright(self):
-        pacman.surface=pygame.image.load(MOUSERIGHT).convert_alpha()
         self.rect.x+=self.speed
 
     def moveleft(self):
-        pacman.surface=pygame.image.load(MOUSELEFT).convert_alpha()
         self.rect.x-=self.speed
 
     def moveup(self):
-        pacman.surface=pygame.image.load(MOUSEUP).convert_alpha()
         self.rect.y-=self.speed
     
     def movedown(self):
-        pacman.surface=pygame.image.load(MOUSEDOWN).convert_alpha()
         self.rect.y+=self.speed
+
+    def moveSet(self):
+        self.up=1
+        self.down=1
+        self.right=1
+        self.left=1
+
+class ghost (sprite):
+    global ghosts
+    ghosts=[]
+
+    def __init__(self, fileLocation, x, y):
+        super().__init__(fileLocation, x, y)
+        ghosts.append(self)
+        self.livesLeft=1
+
+    def upBias(self):
+        if self.up==1:
+            self.down=0
+            self.right=0
+            self.left=0
+        if self.right==1 and self.left==1: self.right=0
+        if self.down==1 and self.left==1: self.down=0
+        if self.down==1 and self.right==1: self.down=0
+
+    def leftBias(self):
+        if self.left==1:
+            self.down=0
+            self.right=0
+            self.up=0
+        if self.up==1 and self.down==1: self.down=0
+        if self.right==1 and self.down==1: self.right=0
+        if self.right==1 and self.up==1: self.right=0
+
+    def downBias(self):
+        if self.down==1:
+            self.up=0
+            self.right=0
+            self.left=0
+        if self.right==1 and self.left==1: self.right=0
+        if self.up==1 and self.left==1: self.up=0
+        if self.up==1 and self.right==1: self.up=0
+    
+    def rightBias(self):
+        if self.right==1:
+            self.down=0
+            self.left=0
+            self.up=0
+        if self.up==1 and self.down==1: self.down=0
+        if self.left==1 and self.down==1: self.left=0
+        if self.left==1 and self.up==1: self.left=0
 
 class obsticle(surface):
     global allObsticles
@@ -137,34 +196,37 @@ class obsticle(surface):
 
     @classmethod
     def intagabilityOff(obsticle, object):
-        global down
         global right
         global left
         global up
         global down
-        if right==1:
+        collisions=0
+        if object.right==1:
             futurex=object.rect.right+object.speed
-            number=1
             for each in allObsticles:
                     if each.x <= futurex <= (each.x+each.width) and ((each.y <= object.rect.top <= (each.y+each.height)) or (each.y <= object.rect.bottom <= (each.y+each.height))):
-                        right=0
-        if left==1:
+                        object.right=0
+                        collisions=collisions+1
+        if object.left==1:
             futurex=object.rect.left-object.speed
-            number=1
             for each in allObsticles:
                 if each.x <= futurex <= each.x+each.width and ((each.y <= object.rect.top <= (each.y+each.height)) or (each.y <= object.rect.bottom <= (each.y+each.height))):
-                    left=0
-                number+=1
-        if down==1:
+                    object.left=0
+                    collisions=collisions+1
+        if object.down==1:
             futurey=object.rect.bottom+object.speed
             for each in allObsticles:
                 if each.y <= futurey <= each.y+each.height and ((each.x <= object.rect.left <= (each.x+each.width)) or (each.x <= object.rect.right <= (each.x+each.width))):
-                    down=0
-        if up==1:
+                    object.down=0
+                    collisions=collisions+1
+        if object.up==1:
             futurey=object.rect.top-object.speed
             for each in allObsticles:
                 if each.y <= futurey <= each.y+each.height and ((each.x <= object.rect.left <= (each.x+each.width)) or (each.x <= object.rect.right <= (each.x+each.width))):
-                    up=0
+                    object.up=0
+                    collisions=collisions+1
+        if collisions>=2:
+            object.cornerInd=object.cornerInd+1
             
 
 class tictac(surface):
@@ -199,22 +261,46 @@ class tictac(surface):
                 each.appear()
 
     @classmethod
-    def number(tictac):
-        print(str(len(allTictacs)))
-
-    @classmethod
     def getsEaten(tictac):
         global score
-        global time
         for each in allTictacs:
             if each.rect.colliderect(pacman.rect):
                 if each.show==True:
                     each.show=False
                     score+=1
-                    time=10
-                    
 
-                
+class lives(surface):
+    global allLives
+    allLives=[]
+
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.surface=pygame.image.load(HEART).convert_alpha()
+        self.rect=self.surface.get_rect(topleft=(self.x,self.y))
+        allLives.append(self)
+        self.show=True
+
+    @classmethod
+    def loseLife(lives):
+        pacman.livesLeft=pacman.livesLeft-1
+        lifeLost = allLives[pacman.livesLeft]
+        lifeLost.show=False
+        if pacman.livesLeft==0:
+            gameover()
+
+    @classmethod
+    def reset(lives):
+        pacman.livesLeft=3
+        for each in allLives:
+            each.show=True
+
+    @classmethod
+    def show(lives):
+        for each in allLives:
+            if each.show==True:
+                each.appear()
+
+
 def grid():
     global xValues
     global yValues
@@ -234,11 +320,11 @@ def grid():
 #allows user to pause the game
 def pause():
     paused=1
+    pacman.left=0
+    pacman.right=0
+    pacman.up=0
+    pacman.down=0
     #these values must be initialised again to prevent errors
-    up=0
-    down=0
-    left=0
-    right=0
     while paused==1:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -249,8 +335,42 @@ def pause():
                 if event.type==MOUSEBUTTONDOWN:
                     paused=0
 
+def gameover():
+    over=1
+    global start
+    gameOverButton.appear()
+    pygame.display.update()
+    while over==1:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit() #this is needed so can still quit
+            mousePosition=pygame.mouse.get_pos()
+            if gameOverButton.rect.collidepoint(mousePosition):
+                if event.type==MOUSEBUTTONDOWN:
+                    over=0
+                    start=0
+
+def gameWon():
+    won=1
+    global start
+    gameWonButton.appear()
+    pygame.display.update()
+    while won==1:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit() #this is needed so can still quit
+            mousePosition=pygame.mouse.get_pos()
+            if gameWonButton.rect.collidepoint(mousePosition):
+                if event.type==MOUSEBUTTONDOWN:
+                    won=0
+                    start=0
+    
+
 #defines background image
-background=image(BG_IMAGE)
+#background=image(BG_IMAGE)
+background=surface(0,0,WIN_WIDTH,WIN_HEIGHT)
 
 #defines where the obsticals are
 leftBoundary=obsticle(0,0,GRID_WIDTH,WIN_HEIGHT)
@@ -277,82 +397,181 @@ line5=obsticle(underF.x,underF.rect.bottom+GRID_HEIGHT,GRID_WIDTH*3,GRID_HEIGHT)
 #creates pacman
 pacman=sprite(MOUSERIGHT,STARTING_X,STARTING_Y)
 pacman.setSpeed(PACMAN_SPEED)
-pacmanGroup=pygame.sprite.Group()
-pacmanGroup.add(pacman)
+
+#creates ghosts
+ghost1=ghost(CAT1,WIN_WIDTH/2,WIN_HEIGHT/2)
+ghost2=ghost(CAT2, (WIN_WIDTH/2)+GRID_WIDTH, (WIN_HEIGHT/2)+GRID_HEIGHT)
+ghost3=ghost(CAT3, (WIN_WIDTH/2)+2*GRID_WIDTH, (WIN_HEIGHT/2)+GRID_HEIGHT)
+for ghost in ghosts:
+    ghost.setSpeed(PACMAN_SPEED)
 
 #creates buttons
 pausedButton=button('Click to unpause','red')
-
-#initialises movement values
-up=0
-down=0
-left=0
-right=0
+gameOverButton=button('Game over - click to play again','red')
+gameWonButton=button('Game Won! - Would you like to play again?', 'pink')
 
 #creates tictacs
 tictac.generate()
-score=-1
 
-#contains the code which updates the game continuously
-while True: 
-    for event in pygame.event.get():
-        #allows window to be closed by pressing button in upper right corner
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-        #pauses game if player presses right mouse button
-        if event.type==MOUSEBUTTONDOWN:
-            pausedButton.appear()
+n=1
+while n<4:
+    a=lives(WIN_WIDTH-n*GRID_WIDTH,0)
+    n=n+1
+
+start=0
+startText=button('Choose an option to start','green','white',(WIN_WIDTH/2, (WIN_HEIGHT/2)-2*GRID_HEIGHT), 'center')
+hardMode=button('Hard - game is over if you get eaten by a cat','red')
+easyMode=button('Easy - survive 2 times before you get eaten','blue', 'white',(WIN_WIDTH/2, (WIN_HEIGHT/2)+2*GRID_HEIGHT),'center')
+
+while True:
+    while start==0:
+        background.appear()
+        time=0
+        score=-1
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit() #this is needed so can still quit while game is paused
+            startText.appear()
+            hardMode.appear()
+            easyMode.appear()
             pygame.display.update()
-            pause()
-        #defines pacman's movements
-        if event.type==pygame.KEYDOWN:
-            if event.key==pygame.K_DOWN:
-                down=1
-            if event.key==pygame.K_UP:
-                up=1
-            if event.key==pygame.K_LEFT:
-                left=1
-            if event.key==pygame.K_RIGHT:
-                right=1
-        if event.type==pygame.KEYUP:
-            if event.key==pygame.K_DOWN:
-                down=0
-            if event.key==pygame.K_UP:
-                up=0
-            if event.key==pygame.K_LEFT:
-                left=0
-            if event.key==pygame.K_RIGHT:
-                right=0
+            mousePosition=pygame.mouse.get_pos()
+            if hardMode.rect.collidepoint(mousePosition):
+                if event.type==MOUSEBUTTONDOWN:
+                    start=1
+                    easy=0
+                    hard=1
+            if easyMode.rect.collidepoint(mousePosition):
+                if event.type==MOUSEBUTTONDOWN:
+                    start=1
+                    easy=1
+                    hard=0
 
-    obsticle.intagabilityOff(pacman)
-    if down==1: pacman.movedown()
-    if up==1: pacman.moveup()
-    if left==1: pacman.moveleft()
-    if right==1: pacman.moveright()
+    pacman.rect.x=STARTING_X
+    pacman.rect.y=STARTING_Y
+    ghost1.rect.x=CAT1X
+    ghost1.rect.y=CAT1Y
+    ghost2.rect.x=CAT1X
+    ghost2.rect.y=CAT2Y
+    ghost3.rect.x=CAT3X
+    ghost3.rect.y=CAT3Y
+    #resets all sprites to their starting positions
 
-    # if pacman.rect.y<=upperBoundary.rect.bottom: pacman.rect.y=upperBoundary.rect.bottom
-    # if pacman.rect.bottom>=lowerBoundary.rect.top: pacman.rect.bottom=lowerBoundary.rect.top
-    # if pacman.rect.x<=leftBoundary.rect.right: pacman.rect.x=leftBoundary.rect.right
-    # if pacman.rect.right>=rightBoundary.rect.left: pacman.rect.right=rightBoundary.rect.left
+    pacman.right=0
+    pacman.left=0
+    pacman.up=0
+    pacman.down=0
+    #these values need to be reinitialised to prevent errors
 
-    #the order things will appear on screen
-    background.appear()
-    obsticle.show()
-    pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
-    pacman.appear()
-    tictac.getsEaten()
-    tictac.show()
-    # if time > 0:
-    #     pacman.surface=pygame.image.load(PACMAN_OPEN).convert_alpha()
-    #     pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
-    # else:
-    #     pacman.surface=pygame.image.load(PACMAN_CLOSED).convert_alpha()
-    #     pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
-    time-=1
-    scoreShow=button('score:' + str(score),'None','white',(0,0),'topLeft')
-    scoreShow.appear()
+    for each in allTictacs:
+        each.show=True
+    #resets tictacs
 
-    #causes display window to continually update at chosen framerate
-    pygame.display.update()
-    clock.tick(FRAMERATE)
+    lives.reset()
+
+    #contains the code which updates the game continuously
+    while start==1:
+        for event in pygame.event.get():
+            #allows window to be closed by pressing button in upper right corner
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            #pauses game if player presses right mouse button
+            if event.type==MOUSEBUTTONDOWN:
+                pausedButton.appear()
+                pygame.display.update()
+                pause()
+            #defines pacman's movements
+            if event.type==pygame.KEYDOWN:
+                if event.key==pygame.K_DOWN:
+                    pacman.down=1
+                if event.key==pygame.K_UP:
+                    pacman.up=1
+                if event.key==pygame.K_LEFT:
+                    pacman.left=1
+                if event.key==pygame.K_RIGHT:
+                    pacman.right=1
+            if event.type==pygame.KEYUP:
+                if event.key==pygame.K_DOWN:
+                    pacman.down=0
+                if event.key==pygame.K_UP:
+                    pacman.up=0
+                if event.key==pygame.K_LEFT:
+                    pacman.left=0
+                if event.key==pygame.K_RIGHT:
+                    pacman.right=0
+
+        obsticle.intagabilityOff(pacman)
+        if pacman.down==1: pacman.movedown()
+        if pacman.up==1: pacman.moveup()
+        if pacman.left==1: pacman.moveleft()
+        if pacman.right==1: pacman.moveright()
+
+        for ghost in ghosts:
+            ghost.moveSet()
+            obsticle.intagabilityOff(ghost)
+
+        if ghost1.cornerInd % 4 == 3: ghost1.downBias()
+        if ghost1.cornerInd % 4 == 2: ghost1.rightBias()
+        if ghost1.cornerInd % 4 == 1: ghost1.upBias()
+        if ghost1.cornerInd % 4 == 0: ghost1.leftBias()
+        if time % 150 == 0 : ghost1.cornerInd=ghost1.cornerInd+1
+
+        if ghost2.cornerInd % 4 == 3: ghost2.rightBias()
+        if ghost2.cornerInd % 4 == 2: ghost2.upBias()
+        if ghost2.cornerInd % 4 == 1: ghost2.leftBias()
+        if ghost2.cornerInd % 4 == 0: ghost2.downBias()
+        if time % 150 == 0 : ghost2.cornerInd=ghost2.cornerInd+1
+
+        if ghost3.cornerInd % 4 == 3: ghost3.upBias()
+        if ghost3.cornerInd % 4 == 2: ghost3.rightBias()
+        if ghost3.cornerInd % 4 == 1: ghost3.downBias()
+        if ghost3.cornerInd % 4 == 0: ghost3.leftBias()
+        if time % 150 == 0 : ghost3.cornerInd=ghost2.cornerInd+1
+
+        for ghost in ghosts:
+            if ghost.down==1: ghost.movedown()
+            if ghost.up==1: ghost.moveup()
+            if ghost.left==1: ghost.moveleft()
+            if ghost.right==1: ghost.moveright()
+            if ghost.rect.colliderect(pacman.rect):
+                if hard==1:
+                    gameover()
+                if easy==1:
+                    lives.loseLife()
+                    pacman.rect.x=STARTING_X
+                    pacman.rect.y=STARTING_Y
+
+        #the order things will appear on screen
+        background.appear()
+        obsticle.show()
+        pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
+        pacman.appear()
+        for ghost in ghosts:
+            ghost.appear()
+        tictac.getsEaten()
+        tictac.show()
+        # if time > 0:
+        #     pacman.surface=pygame.image.load(PACMAN_OPEN).convert_alpha()
+        #     pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
+        # else:
+        #     pacman.surface=pygame.image.load(PACMAN_CLOSED).convert_alpha()
+        #     pacman.surface=pygame.transform.scale(pacman.surface,PACMAN_SIZE)
+        time=time+1
+        scoreShow=button('score:' + str(score),'None','white',(0,0),'topLeft')
+        scoreShow.appear()
+        if easy==1:
+            lives.show()
+
+        n=0
+        for each in allTictacs:
+            if each.show==False:
+                n=n+1
+
+        if n==len(allTictacs):
+            gameWon()
+
+        #causes display window to continually update at chosen framerate
+        pygame.display.update()
+        clock.tick(FRAMERATE)
